@@ -1,0 +1,1466 @@
+<template>
+  <div class="group-management">
+    <el-container>
+      <!-- Sidebar Menu -->
+      <el-aside width="200px" class="sidebar">
+        <el-menu :default-active="defaultActive" class="el-menu-vertical" @select="handleSelect">
+          <el-menu-item index="1">
+            <i class="el-icon-s-management"></i>
+            <span><el-icon>
+                <Grid />
+              </el-icon>分组管理</span>
+          </el-menu-item>
+          <el-menu-item index="2">
+            <i class="el-icon-user"></i>
+            <span><el-icon>
+                <UserFilled />
+              </el-icon>所有成员</span>
+          </el-menu-item>
+          <el-menu-item index="3">
+            <i class="el-icon-message"></i>
+            <span><el-icon>
+                <CircleCloseFilled />
+              </el-icon>已禁用</span>
+          </el-menu-item>
+          <el-menu-item index="4">
+            <i class="el-icon-document"></i>
+            <span><el-icon>
+                <Avatar />
+              </el-icon>成员申请</span>
+          </el-menu-item>
+        </el-menu>
+      </el-aside>
+
+      <!-- Main Content -->
+      <el-container>
+        <div class="group-content" v-show="defaultActive === '1'">
+          <el-header class="header">
+            <el-button type="primary" @click="createGroup" class="create-group-button">+ 创建分组</el-button>
+            <el-input v-model="search" placeholder="请输入分组名称" class="search-input" @keyup.enter="handleEnter" clearable>
+              <template #suffix>
+                <el-icon size="large" @click="handleEnter" style="cursor: pointer;">
+                  <Search />
+                </el-icon>
+              </template>
+            </el-input>
+          </el-header>
+          <el-main class="group-main">
+            <el-table :data="groups" stripe border class="group-table">
+              <el-table-column prop="name" label="分组名称" align="center"></el-table-column>
+              <el-table-column prop="accounts" label="包含账号" align="center" class="font-color"></el-table-column>
+              <el-table-column prop="remark" label="备注" align="center"
+                class="remark-column font-color"></el-table-column>
+              <el-table-column label="操作" width="500" align="center">
+                <template #default="scope">
+                  <el-button type="primary" plain size="large" @click="addMember(scope.row)"
+                    v-show="scope.row.id !== 4">+ 添加成员</el-button>
+                  <span style="color:	#C0C0C0;display: flex;align-items: center;margin-left: 19px;"
+                    v-show="scope.row.id !== 3 && scope.row.id !== 4"> | </span>
+                  <el-button type="primary" text size="large" @click="editGroup(scope.row)"
+                    v-show="scope.row.id !== 3 && scope.row.id !== 4">编辑</el-button>
+                  <span style="color: #C0C0C0;display: flex;align-items: center;margin-left: 19px;"
+                    v-show="scope.row.id !== 4"> | </span>
+                  <el-button type="primary" text size="large" @click="viewMembers(scope.row)"
+                    v-show="scope.row.id !== 4">查看成员</el-button>
+                  <el-dropdown v-show="scope.row.id !== 3 && scope.row.id !== 4">
+                    <el-icon size="large" style="">
+                      <MoreFilled />
+                    </el-icon>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item @click="deleteGroup(scope.row)">删除分组</el-dropdown-item>
+                        <el-dropdown-item @click="copyGroup(scope.row)">复制分组</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <!-- Pagination -->
+            <div class="pagination">
+              <div class="pagination-">共{{ groups.length }}条数据</div>
+              <el-pagination background layout="sizes, prev, pager, next" :total="groups.length"
+                :page-size="[5, 10, 20, 50]" @current-change="handlePageChange"></el-pagination>
+            </div>
+          </el-main>
+        </div>
+        <div class="member-management" v-show="defaultActive === '2'">
+          <div class="member-management-content">
+            <!-- Header Buttons -->
+            <div class="header-buttons">
+              <el-button type="primary" size="lager" @click="addMemberInAll(null)">+ 添加成员</el-button>
+              <el-button size="lager" @click="inviteMember">邀请成员</el-button>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters">
+              <el-select v-model="selectedGroup" placeholder="请选择分组" size="lager" class="filter-select">
+                <el-option v-for="group in [{ id: 0, name: '全部' }].concat(groups)" :key="group.id" :label="group.name"
+                  :value="group.id" />
+              </el-select>
+              <el-input v-model="search" style="max-width: 600px" size="lager" placeholder="请输入"
+                class="input-with-select" clearable>
+                <template #prepend>
+                  <el-select v-model="selectedFilter" placeholder="姓名" style="width: 115px">
+                    <el-option label="姓名" value="1" />
+                    <el-option label="备注名" value="2" />
+                    <el-option label="手机/邮箱" value="3" />
+                  </el-select>
+                </template>
+              </el-input>
+            </div>
+          </div>
+
+          <!-- Member List -->
+          <el-card class="member-card" shadow="never" v-for="member in filteredAllMembers" :key="member.id">
+            <div class="all-members">
+              <img src="../../assets/容器 240@4x.png" alt="" srcset=""
+                style="width: 40px;height: 40px;margin-right: 10px;">
+              <div class="member-card-info">
+                <div class="member-card-info-top">
+                  <span class="name">{{ member.username }}</span>
+                  <el-tag size="small"
+                    :type="member.group === 'BOSS' ? 'warning' : member.group === '管理员' ? 'success' : 'info'"
+                    style="margin: 0 10px;">{{
+                      member.group
+                    }}</el-tag>
+                </div>
+                <div class="member-card-info-bottom">
+                  <div>姓名：{{ member.name }}</div>
+                  <div>手机号/邮箱：{{ member.phoneAndEmail }}</div>
+                  <div>分组：<el-tag effect="plain" type="info">{{ member.group }}</el-tag></div>
+                  <div class="acc-1"><span>授权环境：</span><span>{{ member.accreditEnv }}</span></div>
+                </div>
+              </div>
+              <div style="display: flex;align-items: center;">
+                <div v-if="member.group === 'BOSS' || member.group === '管理员'" class="all-m-option"><el-button
+                    type="primary" text size="large" @click="openMemberDrawer(member)">详情</el-button></div>
+                <div v-else class="all-m-option"><el-button type="primary" text size="large"
+                    @click="openEnvironmentSelector(member)">授权环境
+                  </el-button> <!-- 授权环境: 打开授权环境对话框 -->
+                  <span style="color:	#C0C0C0;display: flex;align-items: center;">|</span>
+                  <el-button type="primary" text size="large" @click="addMemberInAll(member)">编辑</el-button>
+                  <div style="display: flex;align-items: center;">
+                    <el-dropdown>
+                      <el-icon>
+                        <More />
+                      </el-icon>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item @click="openMemberDrawer(member)">查看详情</el-dropdown-item>
+                          <el-dropdown-item @click="disableMember(member)">禁用成员</el-dropdown-item>
+                          <el-dropdown-item divided @click="deleteMember(member)">删除成员</el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </el-card>
+        </div>
+        <div class="member-management" v-show="defaultActive === '3'">
+          <!-- Filters -->
+          <div class="filters forbid-filters">
+            <el-select v-model="selectedGroupForbid" placeholder="请选择分组" size="lager" class="filter-select">
+              <el-option v-for="group in [{ id: 0, name: '全部' }].concat(groups)" :key="group.id" :label="group.name"
+                :value="group.id" />
+            </el-select>
+            <el-input v-model="searchForbid" style="width: 300px;" size="lager" placeholder="请输入"
+              class="input-with-select" clearable>
+              <template #prepend>
+                <el-select v-model="selectedFilterForbid" placeholder="姓名" style="width: 115px">
+                  <el-option label="姓名" value="1" />
+                  <el-option label="备注名" value="2" />
+                  <el-option label="手机/邮箱" value="3" />
+                </el-select>
+              </template>
+            </el-input>
+          </div>
+
+          <!-- Member List -->
+          <el-card class="member-card" shadow="never" v-for="member in filteredAllMembersForbid" :key="member.id">
+            <div class="all-members" style="color: #C0C0C0;">
+              <img src="../../assets/容器 240@4x.png" alt="" srcset=""
+                style="width: 40px;height: 40px;margin-right: 10px;">
+              <div class="member-card-info">
+                <div class="member-card-info-top">
+                  <span class="name">{{ member.username }}</span>
+                  <el-tag size="small"
+                    :type="member.group === 'BOSS' ? 'warning' : member.group === '管理员' ? 'success' : 'info'"
+                    style="margin: 0 10px;">{{
+                      member.group
+                    }}</el-tag>
+                </div>
+                <div class="member-card-info-bottom">
+                  <div>姓名：{{ member.name }}</div>
+                  <div>手机号/邮箱：{{ member.phoneAndEmail }}</div>
+                  <div>分组：<el-tag effect="plain" type="info">{{ member.group }}</el-tag></div>
+                  <div class="acc-1"><span>授权环境：</span><span>{{ member.accreditEnv }}</span></div>
+                </div>
+              </div>
+              <div style="display: flex;align-items: center;">
+                <div class="all-m-option"><el-button type="success" text size="large" @click="enableMember(member)">启用
+                  </el-button> <!-- 授权环境: 打开授权环境对话框 -->
+                  <span style="color:	#C0C0C0;display: flex;align-items: center;">|</span>
+                  <el-button type="danger" text size="large" @click="deleteMember(member)">删除</el-button>
+                  <div style="display: flex;align-items: center;">
+                    <el-dropdown>
+                      <el-icon>
+                        <More />
+                      </el-icon>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item @click="openMemberDrawer(member)">查看详情</el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </el-card>
+          <!-- Pagination -->
+          <div class="pagination" style="flex: 1;display: flex;align-items: flex-end;">
+            <div class="pagination-">共{{ filteredAllMembersForbid.length }}条数据</div>
+            <el-pagination background layout="sizes, prev, pager, next" :total="filteredAllMembersForbid.length"
+              :page-size="[5, 10, 20, 50]" @current-change="handlePageChange"></el-pagination>
+          </div>
+        </div>
+        <div class="member-management application-for-membership" v-show="defaultActive === '4'">
+          <div class="filters forbid-filters">
+            <el-select v-model="selectedStatusApply" placeholder="请选择审核状态" size="lager" class="filter-select"
+              style="width: 150px;margin-right: 10px;">
+              <el-option label="待审核" :value="0" />
+              <el-option label="同意" :value="1" />
+              <el-option label="拒绝" :value="-1" />
+            </el-select>
+            <el-input v-model="searchForApply" style="width: 300px;" size="lager" placeholder="请输入"
+              class="input-with-select" clearable>
+              <template #prepend>
+                <el-select v-model="selectInputApply" placeholder="请输入" style="width: 115px">
+                  <el-option label="姓名" value="1" />
+                  <el-option label="手机/邮箱" value="2" />
+                </el-select>
+              </template>
+            </el-input>
+          </div>
+
+          <!-- 申请成员列表 -->
+          <el-card class="member-card" shadow="never" v-for="member in filteredAllMembersApply" :key="member.id">
+            <!-- {{ member }} -->
+            <div class="all-members" style="width: 100%;">
+              <img src="../../assets/容器 240@4x.png" alt="" srcset=""
+                style="width: 40px;height: 40px;margin-right: 10px;">
+              <div class="member-card-info" style="flex: 1;display: flex;justify-content: space-between;flex-direction: row;align-items: center;">
+                <div class="member-c-i-main1" style="">
+                  <div>{{ member.username }}
+                    <el-tag size="small"
+                      :type="member.groupId === 4 ? 'warning' : member.groupId === 3 ? 'success' : 'info'"
+                      style="margin: 0 10px;">{{
+                        groups.find(item => item.id === member.groupId)?.name
+                      }}</el-tag>
+                  </div>
+                  <div style="color: #C0C0C0;">手机号/邮箱：{{ member.phoneAndEmail }}</div>
+                  <div style="color: #C0C0C0;">邀请人：{{ member.invitePeople }}</div>
+                </div>
+                <div class="member-c-i-main2" style="color: #C0C0C0;">
+                  用户组<el-tag size="small" style="margin: 0 10px;">{{
+                    groups.find(item => item.id === member.groupId)?.name
+                  }}</el-tag>
+                </div>
+                <div class="member-c-i-main3">
+                  <div style="color: #C0C0C0;">申请时间：{{ member.applyTime }}</div>
+                  <div style="color: #C0C0C0;">状态：<span style="color: black;">{{ member.state === 0 ? '待审核' : member.state === 1 ? '同意' : '拒绝' }}</span></div>
+                </div>
+              </div>
+              <div style="display: flex;align-items: center;">
+                <div class="all-m-option">
+                  <el-button v-show="member.state !== 1" type="success" text size="large" @click="agreeApply(member)">同意
+                  </el-button> <!-- 授权环境: 打开授权环境对话框 -->
+                  <span v-show="member.state === 0" style="color:	#C0C0C0;display: flex;align-items: center;">|</span>
+                  <el-button v-show="member.state !== -1" type="danger" text size="large" @click="refuseApply(member)">拒绝</el-button>
+                </div>
+              </div>
+            </div>
+          </el-card>
+          <!-- Pagination -->
+          <div class="pagination" style="flex: 1;display: flex;align-items: flex-end;">
+            <div class="pagination-">共{{ filteredAllMembersApply.length }}条数据</div>
+            <el-pagination background layout="sizes, prev, pager, next" :total="filteredAllMembersApply.length"
+              :page-size="[5, 10, 20, 50]" @current-change="handlePageChange"></el-pagination>
+          </div>
+        </div>
+      </el-container>
+    </el-container>
+    <!-- 创建分组弹出框 -->
+    <!-- Dialog -->
+    <el-dialog title="新建分组" v-model="groupDialogVisible" width="1000" :close-on-click-modal="false"
+      class="create-group-dialogs">
+      <!-- Form -->
+      <div>
+        <el-form :model="form" label-width="180px">
+          <!-- Group Name -->
+          <el-form-item label="分组名称:" :rules="[{ required: true, message: '请输入分组名称', trigger: 'change' }]">
+            <el-input v-model="form.groupName" placeholder="请输入分组名称" />
+          </el-form-item>
+
+          <!-- Remark -->
+          <el-form-item label="备注:">
+            <el-input v-model="form.remark" placeholder="请输入备注内容" type="textarea" :rows="2" />
+          </el-form-item>
+
+          <!-- Permission Management -->
+          <!-- <el-form-item style="display: flex; flex-direction: column;width: 100%;"> -->
+          <div style="display: flex; flex-direction: column;">
+            <div style="display: flex;margin: 10px 0;">权限管理<div
+                style="font-size: 12px;color: #909399;margin-left: 10px;">
+                请为分组分配权限功能，同个分组的成员功能权限一致
+              </div>
+            </div>
+            <!-- <el-cascader :options="options" :props="props" clearable size="large" /> -->
+            <el-cascader-panel style="width: fit-content" :props="props" :options="options" v-model="form.role" />
+          </div>
+          <!-- </el-form-item> -->
+        </el-form>
+      </div>
+
+
+      <!-- Footer -->
+      <template #footer>
+        <el-button @click="groupDialogVisible = false, resetForm()">取消</el-button>
+        <el-button type="primary" @click="handleConfirm">确定</el-button>
+      </template>
+    </el-dialog>
+    <!-- 添加成员弹出框 -->
+    <el-dialog title="添加成员" v-model="memberDialogVisible" width="1000" :close-on-click-modal="false"
+      class="add-member-dialog" @close="handleClose">
+      <!-- Form -->
+      <el-form :model="memberForm" :rules="rules" ref="formRef" label-width="100px">
+        <!-- Login Account -->
+        <el-form-item label="登录账号" prop="phoneAndEmail">
+          <el-input v-model="memberForm.phoneAndEmail" placeholder="请输入手机号/邮箱号" />
+        </el-form-item>
+
+        <!-- Name -->
+        <el-form-item label="姓名">
+          <el-input v-model="memberForm.name" placeholder="输入手机号/邮箱号后自动获取" />
+        </el-form-item>
+
+        <!-- Remark -->
+        <el-form-item label="备注名" prop="remark">
+          <el-input v-model="memberForm.remark" placeholder="请输入备注名" />
+        </el-form-item>
+
+        <!-- Group Name -->
+        <el-form-item label="分组名称">
+          <div v-if="!addMemFlag">{{ memberForm.groupName }}</div>
+          <div v-else style="width: 100%;display: flex;">
+            <el-select v-model="addMemGroup" placeholder="Select" size="large" style="width: 100%">
+              <el-option v-for="item in groups" :key="item.id" :label="item.name" :value="item.id" />
+            </el-select>
+            <el-button type="primary" size="large" @click="addMemGroupDialog" text>+添加分组</el-button>
+          </div>
+        </el-form-item>
+
+        <!-- Assign Environment -->
+        <el-form-item label="授权环境">
+          <el-button type="primary" @click="openEnvironmentSelector(null)">+ 选择环境</el-button>
+          <div v-if="!memberForm.selectedEnvironment" class="error-text">
+            请选择需要授权给该员工管理的环境
+          </div>
+        </el-form-item>
+      </el-form>
+
+      <!-- Footer -->
+      <template #footer>
+        <el-button @click="memberDialogVisible = false, resetForm()">取消</el-button>
+        <el-button type="primary" @click="submitForm">确定</el-button>
+      </template>
+    </el-dialog>
+    <!-- 添加环境 -->
+    <el-dialog title="授权环境" v-model="envDialogVisible" width="1000px" :close-on-click-modal="false"
+      class="add-environment-dialog">
+      <!-- Sidebar -->
+      <div class="dialog-content">
+        <aside class="sidebar">
+          <div class="sidebar-item">
+            <el-icon>
+              <Edit />
+            </el-icon>
+            备注名
+          </div>
+          <div class="sidebar-value">{{ memberForm.remark == '' ? "未设置" : memberForm.remark }}</div>
+
+          <div class="sidebar-item">
+            <el-icon>
+              <User />
+            </el-icon>
+            姓名
+          </div>
+          <div class="sidebar-value">{{ memberForm.name == '' ? "未设置" : memberForm.name }}</div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="main-content">
+          <div class="header">
+            <p>请选择需要授权的环境</p>
+            <span>已选择 {{ selectedEnvironments.length }} 个环境</span>
+          </div>
+
+          <!-- Filters -->
+          <div class="filters">
+            <!-- <el-checkbox v-model="selectAll">全选</el-checkbox> -->
+            <el-select v-model="selectedEnvironmentType" placeholder="所有环境" size="large" class="filter-item">
+              <el-option v-for="item in environmentType" :key="item.id" :label="item.value" :value="item.id" />
+            </el-select>
+            <el-select v-model="selectedOperationType" placeholder="所有操作类型" size="large" class="filter-item">
+              <el-option v-for="item in operationType" :key="item.id" :label="item.value" :value="item.id" />
+            </el-select>
+            <el-select v-model="selectedGroupEv" placeholder="所有分组" size="large" class="filter-item">
+              <el-option v-for="item in groupType" :key="item.id" :label="item.value" :value="item.id" />
+            </el-select>
+            <!-- <el-input v-model="searchQuery" placeholder="请输入环境名称" size="large" clearable class="filter-item" /> -->
+            <el-input v-model="searchQuery" placeholder="Please input" class="input-with-select" style="width: 300px;">
+              <template #prepend>
+                <el-select v-model="selectInput" placeholder="Select" class="filter2">
+                  <el-option label="环境名称" value="1" />
+                  <el-option label="IP地址" value="2" />
+                  <el-option label="备注" value="3" />
+                </el-select>
+              </template>
+              <template #suffix>
+                <el-icon>
+                  <Search />
+                </el-icon>
+              </template>
+            </el-input>
+          </div>
+
+          <!-- Environment List -->
+          <el-table :data="filteredEnvironments" border style="width: 100%;" @selection-change="handleSelectionChange"
+            v-model:selection="selectedRowsEnv" ref="multipleTable">
+            <el-table-column type="selection" width="55" label="选择" />
+            <el-table-column prop="name" label="环境名称" />
+            <el-table-column prop="ip" label="IP 地址" />
+            <el-table-column prop="location" label="位置" />
+          </el-table>
+        </main>
+      </div>
+
+      <!-- Footer -->
+      <template #footer>
+        <el-button @click="envDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleConfirmEv">确定</el-button>
+      </template>
+    </el-dialog>
+    <!-- 邀请成员 -->
+    <el-dialog v-model="invDialogVisible" title="邀请成员" width="550px" @close="handleClose" class="invite-member-dialog">
+      <p style="margin: 20px 0;">成员可通过在加入团队中输入团队码的方式，在审核之后加入团队</p>
+      <div style="display: flex;align-items: center;justify-content: space-between;margin: 20px 0;">
+        <div style="width: 100px;">分组：</div>
+        <el-select v-model="InvValue" clearable placeholder="选择" style="width: 100%;margin: 0 10px;">
+          <el-option v-for="item in groups" :key="item.id" :label="item.name" :value="item.id" />
+        </el-select>
+        <el-button :type="InvValue == null ? 'info' : 'primary'" :disabled="InvValue == null ? true : false"
+          @click="copyCode">复制团队码</el-button>
+      </div>
+      <!-- 团队码显示区 -->
+      <div class="team-code">
+        <div v-if="!InvValue">团队码</div>
+        <div v-else>{{ getCode(6) }}</div>
+      </div>
+    </el-dialog>
+    <!-- 成员详情 -->
+    <el-drawer v-model="memberDrawer" title="成员详情" size="600px">
+      <div class="member-drawer">
+        <div class="member-d-header">
+          <img src="../../assets/容器 240@4x.png" alt="" srcset="" style="width: 40px;height: 40px;">
+          <div style="font-weight: 800;font-size: 18px;margin: 0 15px;">{{ drawerMember?.username }}</div>
+          <el-tag size="small"
+            :type="drawerMember.group === 'BOSS' ? 'warning' : drawerMember.group === '管理员' ? 'success' : 'info'">{{
+              drawerMember.group
+            }}</el-tag>
+        </div>
+        <div class="member-d-main2">
+          <el-row>
+            <el-col :span="12">
+              <div class="member-d-m-title">备注名:</div>
+              <div class="member-d-m-info">{{ drawerMember.username }}</div>
+            </el-col>
+            <el-col :span="12">
+              <div class="member-d-m-title">姓名:</div>
+              <div class="member-d-m-info">{{ drawerMember.name }}</div>
+            </el-col>
+          </el-row>
+          <el-row>
+            <el-col :span="12">
+              <div class="member-d-m-title">手机号/邮箱号:</div>
+              <div class="member-d-m-info">{{ drawerMember.phoneAndEmail }}</div>
+            </el-col>
+            <el-col :span="12">
+              <div class="member-d-m-title">分组:</div>
+              <div class="member-d-m-info">{{ drawerMember.group }}</div>
+            </el-col>
+          </el-row>
+        </div>
+        <div
+          style="width: 100px;height: 40px;background-color: #fff;display: flex;align-items: center;justify-content: center;border: 2px solid #f5f5f5">
+          已授权环境</div>
+        <div class="member-d-main3">
+          <div class="member-d-m3-main">
+            <!-- 用表格显示当前成员的已授权环境 -->
+            <el-table
+              :data="drawerMember.accEnvIds.map((envId: any) => environments.find((env: any) => env.id === envId))"
+              border style="width: 100%;">
+              <el-table-column prop="name" label="环境名称" />
+              <el-table-column prop="ip" label="IP 地址" />
+              <!-- <el-table-column prop="location" label="位置" />   -->
+            </el-table>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from "vue";
+import {
+  Grid,
+  UserFilled,
+  CircleCloseFilled,
+  Avatar,
+  Search,
+  MoreFilled,
+  More,
+  Edit,
+  User,
+} from "@element-plus/icons-vue";
+import { Connection } from "@element-plus/icons-vue";
+import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus';
+import { computed } from 'vue';
+import { ElTable } from 'element-plus';
+
+const search = ref(""); // Search input binding
+const groups = ref([
+  { id: 1, name: "员工", accounts: 1, remark: "无", role: [1, 101, 10101] },
+  { id: 2, name: "经理", accounts: 0, remark: "无", role: [1, 101, 10102] },
+  { id: 3, name: "管理员", accounts: 0, remark: "无", role: [1, 101, 10103] },
+  { id: 4, name: "BOSS", accounts: 1, remark: "无", role: [1, 101, 10104] },
+]);
+const defaultActive = ref("1");
+
+// Event handlers 创建分组
+const createGroup = () => {
+  groupDialogVisible.value = true;
+  console.log("Create group clicked:", groupDialogVisible.value);
+};
+
+const addMember = (group: any) => {
+  console.log("Adding member to:", group.name);
+  memberForm.value.groupName = group.name
+
+  memberDialogVisible.value = true
+};
+const addMemberInAll = (member: any) => {
+  addMemFlag.value = true
+  if (member) { //编辑成员
+    memberForm.value = member
+  }
+  memberDialogVisible.value = true
+}
+const openMemberDrawer = (member: any) => { //打开成员详情弹出框
+  drawerMember.value = member
+  memberDrawer.value = true
+}
+const disableMember = (member: any) => {  //禁用成员
+  // console.log("禁用成员", member);
+  ElMessageBox.confirm(`确定禁用${member.username}吗？请谨慎操作`, '禁用成员', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+  }).then(() => {
+    ElMessage.warning("未连接后端");
+  }).catch(() => {
+    console.log("取消禁用成员", member);
+  });
+}
+const deleteMember = (member: any) => {  //删除成员
+  // console.log("删除成员", member);
+  ElMessageBox.confirm(`确定删除${member.username}吗？请谨慎操作`, '删除成员', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+  }).then(() => {
+    ElMessage.warning("未连接后端");
+  }).catch(() => {
+    console.log("取消禁用成员", member);
+  });
+}
+const enableMember = (member: any) => {  //启用成员
+  // console.log("启用成员", member);
+  ElMessageBox.confirm(`确定启用${member.username}吗？`, '启用成员', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+  }).then(() => {
+    ElMessage.warning("未连接后端");
+  }).catch(() => {
+    console.log("取消启用成员", member);
+  });
+}
+const editGroup = (group: any) => {
+  console.log("Editing group:", group.name);
+  //将当前组的数据赋值给表单
+  form.value.groupName = group.name
+  form.value.remark = group.remark
+  form.value.role = group.role
+  //查询数据，打开“创建分组弹出框”
+  groupDialogVisible.value = true
+};
+
+const viewMembers = (group: any) => {
+  console.log("Viewing members of:", group.name);
+};
+
+const deleteGroup = (group: any) => {
+  console.log("删除分组", group.name);
+  // TODO: 连接后端删除分组
+  //查询出groups中id等于group.id的元素，删除
+  groups.value = groups.value.filter((value: any, index: any, array: any) => {
+    return value.id !== group.id
+  })
+};
+
+const copyGroup = (group: any) => {
+  console.log("复制分组", group.name);
+  //TODO: 连接后端添加分组，以下为假数据
+  groups.value.forEach((value: any, index: any, array: any) => {
+    console.log("value", value);
+    if (value.id === group.id) {
+      // groups.value.unshift(value)
+      //新分组对象
+      let gCopyObj = { ...value }
+      gCopyObj.accounts = 0
+      gCopyObj.id = groups.value.length + 1
+      //修改name--当name加上(1)后，数组中已经有与其相同的name，则数字加一
+      let name = gCopyObj.name + "(1)"
+      let index = groups.value.findIndex((item: any) => item.name === name)
+      if (index !== -1) { //如果数组中已经有与其相同的name，则数字加一
+        let index = name.lastIndexOf('(')
+        name = name.slice(0, index) + "(" + (parseInt(name.slice(name.lastIndexOf('(') + 1)) + 1) + ")"
+      }
+      gCopyObj.name = name
+      groups.value = [gCopyObj, ...groups.value]
+    }
+  });
+};
+
+const handlePageChange = (page: any) => {
+  console.log("Page changed to:", page);
+};
+
+const handleSelect = (key: string, keyPath: string[]) => {
+  console.log(key, keyPath);
+  defaultActive.value = keyPath[0];
+};
+// ----------------------------------------------------所有成员
+const allMembers = ref([  //所有成员数据
+  { id: 1, username: "yuan", name: "张三", phoneAndEmail: "13800000000", groupId: 1, group: "员工", remark: "无", accreditEnv: 1, accEnvIds: [1] },
+  { id: 2, username: "li", name: "李四", phoneAndEmail: "13800000001", groupId: 2, group: "经理", remark: "无", accreditEnv: 1, accEnvIds: [2] },
+  { id: 3, username: "wang", name: "王五", phoneAndEmail: "yingchao04@qq.com", groupId: 3, group: "管理员", remark: "无", accreditEnv: 1, accEnvIds: [2] },
+  { id: 4, username: "zhao", name: "赵六", phoneAndEmail: "13800000003", groupId: 4, group: "BOSS", remark: "无", accreditEnv: 1, accEnvIds: [1] },
+])
+const selectedGroup = ref();
+const selectedFilter = ref("1"); //所有成员搜索类型
+const selectedFilterForbid = ref("1"); //禁用成员搜索类型
+const addMemFlag = ref(false) //所有成员路由下的添加成员标志
+const addMemGroup = ref(1) //所有成员路由下的添加成员分组
+const addMemGroupDialog = () => {
+  // console.log("添加分组弹窗打开");
+  //进入分组管理页，关闭对话框
+  defaultActive.value = '1'
+  memberDialogVisible.value = false
+}
+const inviteMember = () => {
+  console.log("Invite Member clicked");
+  invDialogVisible.value = true
+};
+// 分组名称搜索
+const handleEnter = () => {
+  console.log("Search clicked");
+};
+// ----------------------------------------------------创建分组弹出框
+// Dialog visibility
+const groupDialogVisible = ref(false);
+const form = ref({
+  groupName: "",
+  remark: "",
+  role: [],
+});
+const resetForm = () => { //表单重置
+  form.value.groupName = ""
+  form.value.remark = ""
+  form.value.role = []
+  memberForm.value.phoneAndEmail = ""
+  memberForm.value.name = ""
+  memberForm.value.remark = ""
+  memberForm.value.groupName = "员工"
+  memberForm.value.selectedEnvironment = null
+}
+// 创建分组/编辑分组权限结构
+const props = { multiple: true }
+const options = [
+  {
+    value: 1,
+    label: '环境',
+    children: [
+      {
+        value: 101,
+        label: '我的环境',
+        children: [
+          { value: 10101, label: '查看数据' },
+          { value: 10102, label: '创建环境' },
+          { value: 10103, label: '九宫格' },
+          { value: 10104, label: '排序' },
+          { value: 10105, label: '编辑账号' },
+          { value: 10106, label: '修改代理' },
+          { value: 10107, label: 'CookieRobot' },
+          { value: 10108, label: '转移环境' },
+        ],
+      },
+      {
+        value: 102,
+        label: '已转移环境',
+        children: [
+          { value: 10201, label: '查看数据' },
+          { value: 10202, label: '详情' },
+          { value: 10203, label: '删除' },
+        ],
+      }
+    ],
+  },
+  {
+    value: 2,
+    label: '云手机',
+    children: [
+      {
+        value: 201,
+        label: '我的云手机',
+        children: [
+          { value: 20101, label: '查看数据' },
+          { value: 20102, label: '详情' },
+          { value: 20103, label: '新建云手机' },
+        ],
+      }
+    ],
+  },
+  {
+    value: 23,
+    label: 'North America',
+    children: [
+      {
+        value: 24,
+        label: 'US',
+        children: [
+          { value: 25, label: 'New York' },
+          { value: 26, label: 'Los Angeles' },
+          { value: 27, label: 'Washington' },
+        ],
+      },
+      {
+        value: 28,
+        label: 'Canada',
+        children: [
+          { value: 29, label: 'Toronto' },
+          { value: 30, label: 'Montreal' },
+          { value: 31, label: 'Ottawa' },
+        ],
+      },
+    ],
+  },
+]
+// Confirm button handler
+const handleConfirm = () => {
+  console.log("------------:", form.value.role);
+
+  groupDialogVisible.value = false;
+  resetForm()
+  form
+};
+
+// ---------------------------------------------------添加成员弹出框
+// Dialog visibility
+const memberDialogVisible = ref(false);
+// Form data
+const memberForm = ref({
+  phoneAndEmail: "",
+  name: "",
+  remark: "",
+  groupName: "员工", // Example group name
+  selectedEnvironment: null,
+});
+// Form validation rules
+const rules = {
+  account: [{ required: true, message: "请输入登录账号", trigger: "blur" }],
+  remark: [{ required: true, message: "请输入备注名", trigger: "blur" }],
+};
+// Reference to form
+const formRef = ref<FormInstance>();
+
+// Submit the form
+const submitForm = () => {
+  formRef.value?.validate((valid: any) => {
+    if (valid) {
+      if (!memberForm.value.selectedEnvironment) {
+        ElMessage.error("请选择需要授权的环境  ");
+        return;
+      }
+      console.log("表单提交数据:", form.value);
+      memberDialogVisible.value = false;
+    } else {
+      console.log("表单校验失败");
+    }
+  });
+};
+
+// -----------------------------------------------------添加环境
+// Dialog visibility
+const envDialogVisible = ref(false);  //环境选择弹出框
+const drawerMember = ref<any>(null) //成员详情弹出框的成员数据
+const memberDrawer = ref(false);  //成员详情弹出框
+const environmentType = ref([{ id: 1, value: '所有环境' }, { id: 2, value: '已授权' }, { id: 3, value: '未授权' }])  //环境类型
+const operationType = ref([{ id: 1, value: '所有操作类型' }, { id: 2, value: 'Windows' }, { id: 3, value: 'Android' }, { id: 4, value: 'macOS' }, { id: 5, value: 'iOS' }])  //操作类型
+const groupType = ref([{ id: 1, value: '所有分组' }])  //分组类型
+const selectedEnvironments = ref<number[]>([]);// 多选的环境的id
+// Filters
+const selectInput = ref('1');  //搜索类型
+const selectedEnvironmentType = ref(1);  //环境类型
+const selectedOperationType = ref(1);  //操作类型
+const selectedGroupEv = ref(1);  //分组类型
+const searchQuery = ref("");  //搜索内容
+const searchForbid = ref("");  //禁用成员搜索内容
+const selectedGroupForbid = ref();  //禁用成员分组类型
+const multipleTable = ref(null); //选择环境的表格
+const selectedRowsEnv = ref<any>([]); //选择的环境的id
+const selectedStatusApply = ref(0);  //审核状态
+const selectInputApply = ref('1');  //审核搜索类型
+const searchForApply = ref("");  //审核搜索内容
+const applyMember = ref([  //申请成员列表
+  { id: 1, username: "zhang", phoneAndEmail: "1243534636", invitePeople: 'hubstudio', groupId: 1, applyTime: '2024/11/28', state: 1 },
+  { id: 2, username: "wang", phoneAndEmail: "1243534637", invitePeople: 'hubstudio', groupId: 2, applyTime: '2024/11/28', state: 0 },
+  { id: 3, username: "li", phoneAndEmail: "1243534637", invitePeople: 'hubstudio', groupId: 1, applyTime: '2024/11/28', state: -1 },
+  { id: 4, username: "wi", phoneAndEmail: "1243534637", invitePeople: 'hubstudio', groupId: 1, applyTime: '2024/11/28', state: -1 },
+])
+const memberForbid = ref([  //禁用成员列表
+  { id: 1, username: "yuan", name: "张三", phoneAndEmail: "13800000000", groupId: 4, group: "BOSS", remark: "无", accreditEnv: 1, accEnvIds: [1] },
+  { id: 2, username: "li", name: "李四", phoneAndEmail: "13800000001", groupId: 3, group: "管理员", remark: "无", accreditEnv: 1, accEnvIds: [2] },
+  { id: 3, username: "wang", name: "王五", phoneAndEmail: "yingchao04@qq.com", groupId: 3, group: "管理员", remark: "无", accreditEnv: 1, accEnvIds: [2] },
+])
+const environments = ref([  //环境列表
+  {
+    id: 1,
+    name: "test2",
+    ip: "36.24.241.70",
+    location: "China, Zhejiang",
+    type: 1,
+    operation: 1,
+    group: 1,
+    remark: "无",
+  },
+  {
+    id: 2,
+    name: "test1",
+    ip: "91.186.218.38",
+    location: "Hong Kong",
+    type: 2,
+    operation: 2,
+    group: 2,
+    remark: "无",
+  },
+]);
+// 过滤筛选环境列表
+const filteredEnvironments = computed(() => {
+  return environments.value.filter((env) => {
+    const matchesType = selectedEnvironmentType.value === 1 || env.type === selectedEnvironmentType.value;
+    const matchesOperation =
+      selectedOperationType.value === 1 || env.operation === selectedOperationType.value;
+    const matchesGroup = selectedGroupEv.value === 1 || env.group === selectedGroupEv.value;
+    let matchesQuery = false
+    // console.log(selectInput.value);
+
+    if (selectInput.value === '1') {
+      matchesQuery = env.name.includes(searchQuery.value);
+      console.log(matchesType && matchesOperation && matchesGroup && matchesQuery);
+
+    } else if (selectInput.value === '2') {
+      matchesQuery = env.ip.includes(searchQuery.value);
+    } else {
+      matchesQuery = env.remark.includes(searchQuery.value);
+    }
+    // matchesQuery.value = env.name.includes(searchQuery.value)
+    return matchesType && matchesOperation && matchesGroup && matchesQuery;
+  });
+});
+// Open environment selector
+const openEnvironmentSelector = (member: any) => {
+  // console.log("环境选择弹窗打开:", member.accEnvIds);
+  if (member) {
+    // selectedEnvironments.value = member.accEnvIds
+    // console.log("selectedEnvironments.value", selectedEnvironments.value);
+    // TODO: 自动选中以数组member.accEnvIds为id的环境  无效
+    // 1. 遍历member.accEnvIds，找到environments中id与member.accEnvIds相同的元素
+    // 2. 将找到的元素添加到selectedRowsEnv中
+    // 3. 调用multipleTable的toggleRowSelection方法，选中找到的元素 
+    // selectedRowsEnv.value = member.accEnvIds.filter((row: any) => environments.value.find((env: any) => env.id === row));
+    // if (multipleTable.value) {
+    //   multipleTable.value.toggleRowSelection(selectedRowsEnv.value, true);
+    // }
+    // console.log("selectedRowsEnv.value----------:", selectedRowsEnv.value);
+
+  }
+
+  envDialogVisible.value = true
+  // You can implement the logic to open another dialog or component for environment selection.
+};
+// 过滤筛选所有成员
+const filteredAllMembers = computed(() => {
+  return allMembers.value.filter((member) => {
+    const matchGroup = selectedGroup.value === undefined || selectedGroup.value === 0 || member.groupId === selectedGroup.value
+    let matchQuery = false
+    if (selectedFilter.value === '1') {
+      matchQuery = member.name.includes(search.value)
+    } else if (selectedFilter.value === '2') {
+      matchQuery = member.username.includes(search.value)
+    } else {
+      matchQuery = member.phoneAndEmail.includes(search.value)
+    }
+    return matchQuery && matchGroup;
+  });
+});
+const filteredAllMembersForbid = computed(() => {  //禁用成员列表过滤器
+  return memberForbid.value.filter((member) => {
+    const matchGroup = selectedGroupForbid.value === undefined || selectedGroupForbid.value === 0 || member.groupId === selectedGroupForbid.value
+    let matchQuery = false
+    if (selectedFilterForbid.value === '1') {
+      matchQuery = member.name.includes(searchForbid.value)
+    } else if (selectedFilterForbid.value === '2') {
+      matchQuery = member.username.includes(searchForbid.value)
+    } else {
+      matchQuery = member.phoneAndEmail.includes(searchForbid.value)
+    }
+    return matchQuery && matchGroup;
+  });
+});
+const filteredAllMembersApply = computed(() => {  //申请成员列表过滤器
+  return applyMember.value.filter((member) => {
+    //根据审核状态的选择过滤
+    const matchState = member.state === selectedStatusApply.value
+    let matchQuery = false
+    if (selectInputApply.value === '1') {
+      matchQuery = member.username.includes(searchForApply.value)
+    } else if (selectInputApply.value === '2') {
+      matchQuery = member.phoneAndEmail.includes(searchForApply.value)
+    } else {
+      matchQuery = true
+    }
+    return matchState && matchQuery;
+  });
+});
+// 同意申请
+const agreeApply = (member: any) => {
+  ElMessageBox.confirm(`确定同意${member.username}吗？`, '启用成员', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+  }).then(() => {
+    ElMessage.warning("未连接后端");
+  }).catch(() => {
+    console.log("取消启用成员", member);
+  });
+}
+// 拒绝申请
+const refuseApply = (member: any) => {
+  ElMessageBox.confirm(`确定拒绝${member.username}吗？`, '启用成员', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+  }).then(() => {
+    ElMessage.warning("未连接后端");
+  }).catch(() => {
+    console.log("取消启用成员", member);
+  });
+}
+// Handle selection change
+const handleSelectionChange = (selection: any) => {
+  selectedEnvironments.value = selection;  //选择的环境
+  console.log("selectedEnvironments.value----------:", selectedEnvironments.value);
+
+};
+// Confirm selection
+const handleConfirmEv = () => {
+  console.log("Selected Environments:", selectedEnvironments.value);
+  envDialogVisible.value = false;
+};
+
+// 邀请成员
+// 控制弹出框是否显示
+const invDialogVisible = ref(false);
+// 打开弹出框
+const openDialog = () => {
+  invDialogVisible.value = true;
+};
+// 关闭弹出框时的回调
+const handleClose = () => {
+  // console.log('弹出框关闭');
+  addMemFlag.value = false
+};
+// 弹出框确认按钮的回调
+const confirmDialog = () => {
+  console.log('确认按钮被点击');
+  invDialogVisible.value = false;
+};
+// 邀请成员弹出框
+const InvValue = ref(null)
+const textToCopy = ref('')
+const getCode = (length: number) => {
+  // console.log("获取团队码");
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    result += characters.charAt(randomIndex);
+  }
+  textToCopy.value = result
+  return result
+}
+const copyCode = async () => {
+  // console.log("复制团队码");
+  try {
+    await navigator.clipboard.writeText(textToCopy.value);
+    ElMessage({
+      message: '复制成功',
+      type: 'success',
+    })
+  } catch (err) {
+    console.error('Failed to copy text: ', err);
+    alert('复制失败');
+  }
+}
+</script>
+
+<style scoped lang="less">
+// 定义一些常用的变量
+@background-color-light: #f5f5f5;
+@border-color: #dcdfe6;
+@font-size-normal: 16px;
+@padding-normal: 20px;
+@margin-normal: 10px;
+@margin-large: 20px;
+@color-primary: #409eff;
+@color-text-secondary: #909399;
+@color-text-tertiary: #606266;
+
+.group-management {
+  height: calc(100vh - 90px);
+  background-color: @background-color-light;
+  display: flex;
+  flex-direction: row;
+
+  .sidebar {
+    // height: 100vh;
+    border-right: 1px solid @border-color;
+    background-color: #fff;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background-color: #fff;
+
+    .create-group-button {
+      width: 150px;
+      height: 50px;
+      font-size: 20px;
+      margin-right: @margin-normal;
+    }
+
+    .search-input {
+      margin-left: @margin-normal;
+      width: 350px;
+      height: 50px;
+    }
+  }
+
+  .group-main {
+    // height: 100%;
+    min-height: calc(100vh - 190px);
+    padding: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep .group-table {
+    margin-top: @margin-large;
+    width: 100%;
+    max-height: calc(100vh - 290px);
+    overflow: scroll;
+
+    .el-table__inner-wrapper {
+      .el-table__header-wrapper {
+        .el-table__header {
+          min-height: 60px; // You can adjust this value as needed
+        }
+      }
+
+      .el-table__body-wrapper {
+        .el-table__body {
+          .el-table__row {
+            height: 90px;
+            font-size: 19px;
+
+            .cell {
+              display: flex;
+              // justify-content: space-around;
+
+              .el-dropdown {
+                display: flex;
+                align-items: center;
+              }
+
+              .el-button {
+                font-size: 20px;
+              }
+
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .pagination {
+    width: 100%;
+    display: flex;
+    flex: 1;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: @margin-large;
+  }
+
+  // 分组管理
+  .group-content {
+    background-color: #fff;
+    width: 100%;
+    padding: @padding-normal;
+  }
+
+  // 所有成员
+  .member-management {
+    padding: @padding-normal;
+    width: 100%;
+    background-color: #fff;
+    display: flex;
+    flex-direction: column;
+
+    .member-management-content {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .header-buttons {
+      margin-bottom: @margin-normal;
+
+      .el-button:first-child {
+        margin-right: @margin-normal;
+      }
+    }
+
+    .filters {
+      display: flex;
+      align-items: center;
+      margin-bottom: @margin-large;
+      background-color: #fff;
+
+      .filter-select {
+        margin-right: @margin-normal;
+        width: 150px;
+      }
+
+      .filter-input {
+        flex: 1;
+      }
+    }
+
+    .forbid-filters {
+      // width: 500px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    :deep(.member-card) {
+      background-color: #fff;
+      padding: 5px 10px;
+      border: 1px solid #eaeaea;
+      border-radius: 8px;
+
+      .el-card__body {
+        padding: 5px 10px;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+
+        .icon {
+          margin-right: @margin-normal;
+          font-size: 24px;
+          color: @color-primary;
+        }
+      }
+
+      .member-info {
+        display: flex;
+        flex-direction: column;
+
+        .info-top {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: @font-size-normal;
+          font-weight: bold;
+        }
+
+        .info-bottom {
+          display: flex;
+          gap: 20px;
+          color: @color-text-secondary;
+          margin-top: 5px;
+        }
+      }
+
+      .card-details {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: @color-text-tertiary;
+
+        span {
+          margin-right: @margin-normal;
+        }
+      }
+    }
+
+    .all-members {
+      height: 70px;
+      display: flex;
+      align-items: center;
+
+      .member-card-info {
+        margin: 0 10px;
+        flex: 1;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+
+        .member-card-info-bottom {
+          display: flex;
+          justify-content: space-between;
+        }
+      }
+
+      .all-m-option {
+        width: 200px;
+        justify-content: center;
+        display: flex;
+      }
+    }
+  }
+
+  // 成员申请
+  .application-for-membership {
+    padding: @padding-normal;
+    width: 100%;
+    background-color: #fff;
+  }
+
+  // 创建分组弹出框
+  :deep(.create-group-dialogs) {
+    height: 800px;
+    padding: 40px 80px;
+    display: flex;
+    flex-direction: column;
+
+    // justify-content: space-between;
+    .el-dialog__footer {
+      flex: 1;
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-end;
+    }
+  }
+
+  #el-popper-container-4476 {
+    :deep(.el-popper) {
+      width: 70%;
+      height: 400px;
+    }
+  }
+
+  // 添加成员弹出框
+  .error-text {
+    margin-top: 5px;
+    color: red;
+    font-size: 12px;
+  }
+
+  .add-member-dialog {
+    height: 650px !important;
+
+    .el-form {
+      .el-form-item {
+        min-height: 70px;
+        display: flex;
+        align-items: center;
+
+        .el-input {
+          // width: 300px;
+          height: 50px;
+        }
+      }
+    }
+  }
+
+  // 添加环境
+  @sidebar-bg-color: #f5f5f5;
+  @text-color-primary: #606266;
+  @text-color-secondary: #909399;
+  @border-radius: 4px;
+  @gap-size: 20px;
+
+  .dialog-content {
+    height: 640px;
+    display: flex;
+    gap: @gap-size;
+
+    .sidebar {
+      width: 150px;
+      background: @sidebar-bg-color;
+      padding: 10px;
+      border-radius: @border-radius;
+
+      .sidebar-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 14px;
+        color: @text-color-primary;
+        margin-bottom: 8px;
+      }
+
+      .sidebar-value {
+        font-size: 14px;
+        color: @text-color-secondary;
+        margin-bottom: 15px;
+      }
+    }
+
+    .main-content {
+      flex: 1;
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 14px;
+        color: @text-color-primary;
+
+        p {
+          margin: 0;
+        }
+      }
+
+      .filters {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 10px;
+
+        .filter-item {
+          width: 150px;
+        }
+
+        :deep(.filter2) {
+          width: 95px;
+          height: 100%;
+
+          .el-select__wrapper {
+            height: 100%;
+          }
+        }
+      }
+    }
+  }
+
+  // 邀请成员对话框
+  .invite-member-dialog {
+    .team-code {
+      width: 100%;
+      height: 80px;
+      font-size: 28px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #d2d7e1;
+    }
+  }
+
+  // 成员详情弹出框
+  .member-drawer {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+
+    .member-d-header {
+      width: 100%;
+      height: 80px;
+      display: flex;
+      align-items: center;
+    }
+
+    .member-d-main2 {
+      width: 100%;
+      height: 200px;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    .member-d-main3 {
+      flex: 1;
+      // width: 100%;
+      background-color: #f5f5f5;
+      padding: 20px 30px;
+      padding-bottom: 60px;
+      // overflow: scroll;
+    }
+
+    .member-d-m-title {
+      font-weight: 800;
+    }
+
+    .member-d-m-info {
+      font-weight: 400;
+      color: #909399;
+    }
+  }
+}
+</style>
